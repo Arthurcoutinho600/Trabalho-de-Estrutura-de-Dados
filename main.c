@@ -9,7 +9,7 @@
 #define LINE_MAX_LEN 256
 #define NAME_COL_WIDTH 15
 
-static int next_line(FILE *f, char *buf, int size, int first) {
+static int next_line(FILE *f, char *buf, int size, int *first) {
 
     while (fgets(buf, size, f)) {
 
@@ -68,7 +68,7 @@ static TeamList *load_teams(const char *path) {
         fprintf(stderr, "Erro: memória insuficiente\n");
         team_list_destroy_with_teams(list);
         fclose(f);
-        return NULL/
+        return NULL;
 
 
     }
@@ -206,8 +206,136 @@ static void print_table(const TeamList * sorted) {
 
         const Team *t = team_node_team(n);
         printf("%3d %2d   ", pos, team_get_id(t));
+        print_padded(stdout, team_get_name(t), NAME_COL_WIDTH);
+        printf("%2d %2d %2d %3d %3d %3d\n", team_get_wins(t), team_get_draws(t), team_get_losses(t), team_get_goals_for(t), team_get_goals_against(t), team_goal_diff(t), team_points(t));
+
 
 
     }
+
+}
+
+static int save_table(const TeamList *sorted, const char *path) {
+
+    FILE *f = fopen(path, "w");
+
+    if (!f) {
+
+        fprintf(stderr, "Erro: não foi possivel gravar %s\n", path);
+        return -1;
+
+    }
+        fprintf(f, "Pos,ID,Time,V,E,D,GM,GS,S,PG\n");
+        int pos = 1;
+
+
+        for (TeamNode *n = team_list_head(sorted); n; n = team_node_next(n), pos++) {
+
+            const Team *t = team_node_team(n);
+            fprintf(f, "%d,%d,%s,%d,%d,%d,%d,%d,%d,%d\n", pos, team_get_id(t), team_get_name(t), team_get_wins(t), team_get_draws(t), team_get_losses(t), team_get_goals_for(t), team_get_goals_against(t), team_goal_diff(t), team_points(t));
+
+        }
+        
+    fclose(f);
+    return 0;
+
+
+}
+
+
+static void print_summary(const TeamList *teams, const TeamList *sorted, const MatchList *matches) {
+
+    int n_teams = team_list_size(teams);
+    int total = n_teams * (n_teams - 1) / 2;
+    int played = match_list_size(matches);
+
+    printf("===== Resumo do Campeonato =====\n");
+    printf("Partidas disputadas: %d de %d\n", played, total);
+
+    if (played == 0) {
+
+        printf("Nenhuma partida foi disputada ainda\n");
+        return;
+
+    }
+
+    const Team *first = team_node_team(team_list_head(sorted));
+    printf("%s: %s (%d pontos)\n", played == total ? "Campeão" : "Lider", team_get_name(first), team_points(first));
+
+    const Team *best_att = first, *best_def = first;
+
+    for (TeamNode *n = team_list_head(sorted); n; n = team_node_next(n)) {
+
+        const Team *t = team_node_team(n);
+        if (team_get_goals_for(t) > team_get_goals_for(best_att))
+
+        best_att = t;
+
+        if (team_get_goals_against(t) < team_get_goals_against(best_def))
+        best_def = t;
+
+    }
+
+    printf("Melhor ataque: %s (%d gols marcados)\n", team_get_name(best_att), team_get_goals_for(best_att));
+    printf("Melhor defesa: %s (%d gols sofridos)\n", team_get_name(best_def), team_get_goals_against(best_def));
+
+    const Match *big = match_node_match(match_list_head(matches));
+
+    for (MatchNode *n = match_list_head(matches); n; n = match_node_next(n))
+
+        if (match_goal_margin(match_node_match(n)) > match_goal_margin(big))
+
+            big = match_node_match(n);
+
+    const Team *a = team_list_find(teams, match_get_team1(big));
+    const Team *b = team_list_find(teams, match_get_team2(big));
+
+    printf("Maior goleada: %s %d x %d %s\n", a ? team_get_name(a) : "?", match_get_goals1(big), match_get_goals2(big), b ? team_get_name(b) : "?");
+
+
+}
+
+int main(void) {
+
+    TeamList *teams = load_teams(TEAMS_FILE);
+    if (!teams)
+    return 1;
+
+    MatchList *matches = load_matches(MATCHES_FILE);
+
+    if (!matches) {
+
+        team_list_destroy_with_teams(teams);
+
+        return 1;
+
+    }
+
+
+    tally(teams, matches);
+
+    TeamList *sorted = rank(teams);
+    int status = 0;
+
+    if (!sorted || team_list_size(sorted) == 0) {
+
+        fprintf(stderr, "Erro: nenhum time para classificar\n");
+        status = 1;
+    } else {
+
+        print_table(sorted);
+        print_summary(teams, sorted, matches);
+
+        if (save_table(sorted, OUTPUT_FILE) != 0)
+
+        status = 1;
+
+    }
+
+    if (sorted)
+    team_list_destroy(sorted);
+    team_list_destroy_with_teams(teams);
+    match_list_destroy(matches);
+    return status;
 
 }
