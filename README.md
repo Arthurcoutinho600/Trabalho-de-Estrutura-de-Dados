@@ -1,2 +1,2 @@
-Nome: Arthur das Neves Coutinho \n
+Nome: Arthur das Neves Coutinho
 Matricula: 20252bsi0437
