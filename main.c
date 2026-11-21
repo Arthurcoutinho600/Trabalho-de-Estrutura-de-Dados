@@ -9,11 +9,16 @@
 #define LINE_MAX_LEN 256
 #define NAME_COL_WIDTH 15
 
+
+/* ----- Carga -----*/
+
+/*Lê um CSV linha a linha ignorando o cabeçalho e linhas em branco. */
+
 static int next_line(FILE *f, char *buf, int size, int *first) {
 
     while (fgets(buf, size, f)) {
 
-        if (*first) {
+        if (*first) { /* descarta o cabeçalho (e um eventual de UTF-8)*/
 
         *first = 0;
         continue;
@@ -29,6 +34,9 @@ static int next_line(FILE *f, char *buf, int size, int *first) {
     return 0;
 
 }
+
+
+
 
 static TeamList *load_teams(const char *path) {
 
@@ -133,6 +141,13 @@ static MatchList *load_matches(const char *path) {
 
 }
 
+/* ----------- Apuração ------------ */
+
+/* Atualiza os dois times de cada partida. partidas com time inexistente 
+* são ignoradas com aviso, para não acessar ponteiro nulo*/
+
+
+
 static void tally(TeamList *teams, const MatchList *matches) {
 
     for (MatchNode *n = match_list_head(matches); n; n = match_node_next(n)) {
@@ -157,6 +172,11 @@ static void tally(TeamList *teams, const MatchList *matches) {
 }
 
 
+/* --------- Classificação -------------*/
+
+/* Insere cada time, um a um, numa nova lista ordenada. A nova lista só 
+* guarda ponteiros: quem libera os times é a lista original. */
+
 static TeamList *rank(const TeamList *teams) {
 
     TeamList *sorted = team_list_create();
@@ -178,6 +198,14 @@ static TeamList *rank(const TeamList *teams) {
     return sorted;
 
 }
+
+
+/* ---------- Relatório -----------------*/
+
+/*printf("%-15s") conta bytes; em UTF-8 isso desalinha acentos. Aqui o 
+* preenchimento é calculado em caracteres (bytes de continuação 10xxxxxxx) 
+* não contam).*/
+
 
 static void print_padded(FILE *out, const char *s, int width) {
 
@@ -246,7 +274,7 @@ static int save_table(const TeamList *sorted, const char *path) {
 static void print_summary(const TeamList *teams, const TeamList *sorted, const MatchList *matches) {
 
     int n_teams = team_list_size(teams);
-    int total = n_teams * (n_teams - 1) / 2;
+    int total = n_teams * (n_teams - 1) / 2; /* turno unico, todos contra todos */
     int played = match_list_size(matches);
 
     printf("===== Resumo do Campeonato =====\n");
@@ -261,6 +289,11 @@ static void print_summary(const TeamList *teams, const TeamList *sorted, const M
 
     const Team *first = team_node_team(team_list_head(sorted));
     printf("%s: %s (%d pontos)\n", played == total ? "Campeão" : "Lider", team_get_name(first), team_points(first));
+
+    /* Percorrendo a lista JÁ ordenada e usando comparação estrita, o 
+    * primeiro time encontrado vence os empates (o mais bem classificado). */
+
+
 
     const Team *best_att = first, *best_def = first;
 
@@ -278,6 +311,9 @@ static void print_summary(const TeamList *teams, const TeamList *sorted, const M
 
     printf("Melhor ataque: %s (%d gols marcados)\n", team_get_name(best_att), team_get_goals_for(best_att));
     printf("Melhor defesa: %s (%d gols sofridos)\n", team_get_name(best_def), team_get_goals_against(best_def));
+
+
+    /* Estrito (>) mantém a primeira partida do arquivo em caso de empate. */
 
     const Match *big = match_node_match(match_list_head(matches));
 
@@ -331,6 +367,9 @@ int main(void) {
         status = 1;
 
     }
+
+    /* A lista ordenada só tem nós; os times são liberados uma única vez, 
+    * pela lista original. */
 
     if (sorted)
     team_list_destroy(sorted);

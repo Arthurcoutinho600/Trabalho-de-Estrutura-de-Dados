@@ -22,7 +22,7 @@ Team *team_create(int id, const char *name) {
 
     t->id = id;
 
-    strncpy(t->name, name, NAME_MAX_LEN - 1);
+    strncpy(t->name, name, NAME_MAX_LEN - 1); /*calloc já garante o '\0' final*/
     return t;
 
 }
@@ -111,6 +111,9 @@ int team_points(const Team *t) {
 
 int team_rank_compare(const Team *a, const Team *b) {
 
+    /*Cada critério só vale se todas os anteriores emparatam. 
+    * Para "maior é melhor", retornamos (b - a): positivo => b na frente. */
+
     if (team_points(a) != team_points(b))
 
     return team_points(b) - team_points(a);
@@ -127,7 +130,7 @@ int team_rank_compare(const Team *a, const Team *b) {
 
     return b->goals_for - a->goals_for;
 
-    return a->id - b->id;
+    return a->id - b->id; /*menor ID à frente*/
 
 
 }
